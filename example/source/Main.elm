@@ -37,17 +37,16 @@ type alias Flags =
 main : MsgReplay.Program Flags Model Msg
 main =
     MsgReplay.application
-        { encodeMsg = encodeMsg
-        , msgDecoder = msgDecoder
-        , fromCache = always Nothing
-        , toCache = output
-        }
         { init = init
         , update = update
         , view = view
         , subscriptions = subscriptions
         , onUrlChange = always DoNothing
         , onUrlRequest = always DoNothing
+        , encodeMsg = encodeMsg
+        , msgDecoder = msgDecoder
+        , loadMsgs = always Nothing
+        , saveMsgs = output
         }
 
 

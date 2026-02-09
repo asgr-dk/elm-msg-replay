@@ -1,4 +1,4 @@
-module MsgReplay exposing (Configuration, Program, application)
+module MsgReplay exposing (Program, application)
 
 import Browser
 import Browser.Navigation
@@ -11,26 +11,20 @@ type alias Program flags model msg =
     Platform.Program flags model msg
 
 
-type alias Configuration flags msg =
-    { encodeMsg : msg -> Json.Encode.Value
-    , msgDecoder : Json.Decode.Decoder msg
-    , fromCache : flags -> Maybe String
-    , toCache : String -> Cmd msg
-    }
-
-
 application :
-    Configuration flags msg
-    ->
-        { init : flags -> Url -> Browser.Navigation.Key -> ( model, Cmd msg )
-        , update : msg -> model -> ( model, Cmd msg )
-        , subscriptions : model -> Sub msg
-        , view : model -> Browser.Document msg
-        , onUrlChange : Url -> msg
-        , onUrlRequest : Browser.UrlRequest -> msg
-        }
+    { init : flags -> Url -> Browser.Navigation.Key -> ( model, Cmd msg )
+    , update : msg -> model -> ( model, Cmd msg )
+    , subscriptions : model -> Sub msg
+    , view : model -> Browser.Document msg
+    , onUrlChange : Url -> msg
+    , onUrlRequest : Browser.UrlRequest -> msg
+    , encodeMsg : msg -> Json.Encode.Value
+    , msgDecoder : Json.Decode.Decoder msg
+    , loadMsgs : flags -> Maybe String
+    , saveMsgs : String -> Cmd msg
+    }
     -> Program flags model msg
-application config app =
+application app =
     Browser.application
         { init = app.init
         , update = app.update
