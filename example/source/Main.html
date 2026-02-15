@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Example</title>
+    <script src="/build/main.js"></script>
+</head>
+<body>
+    <script>
+        const flags = { msgs: localStorage.getItem("msgs")}
+        const main = Elm.Main.init({flags});
+        main.ports.output.subscribe(msgs => localStorage.setItem("msgs", msgs))
+    </script>
+</body>
+</html>

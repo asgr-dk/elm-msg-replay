@@ -17,6 +17,10 @@ port input : (String -> msg) -> Sub msg
 port output : String -> Cmd msg
 
 
+type alias Flags =
+    { msgs : Maybe String }
+
+
 type Msg
     = DoNothing
     | InputName String
@@ -30,10 +34,6 @@ type Model
     | LoggedIn { name : String }
 
 
-type alias Flags =
-    {}
-
-
 main : MsgReplay.Program Flags Model Msg
 main =
     MsgReplay.application
@@ -45,7 +45,7 @@ main =
         , onUrlRequest = always DoNothing
         , encodeMsg = encodeMsg
         , msgDecoder = msgDecoder
-        , loadMsgs = always Nothing
+        , loadMsgs = .msgs
         , saveMsgs = output
         }
 
@@ -79,7 +79,7 @@ update msg model =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = ""
+    { title = "Example"
     , body =
         case model of
             LoggedOut { name, pass } ->
