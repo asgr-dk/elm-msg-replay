@@ -2,8 +2,6 @@
 
 Reliable hot reloading for Elm programs!
 
-![](/example.mp4)
-
 ## Message Replay
 
 The goal of message replay is to regenerate state reliably when iterating on
@@ -15,6 +13,8 @@ want it to be in between code changes.
 
 When a message is changed or removed, replay regenerates all state possible
 until that message fails to decode, partially reproducing the previous state.
+
+![](/demo.gif)
 
 ### How It Works
 
