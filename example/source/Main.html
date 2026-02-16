@@ -10,7 +10,7 @@
     <script>
         const flags = { msgs: localStorage.getItem("msgs")}
         const main = Elm.Main.init({flags});
-        main.ports.output.subscribe(msgs => localStorage.setItem("msgs", msgs))
+        main.ports.saveMsgs.subscribe(msgs => localStorage.setItem("msgs", msgs))
     </script>
 </body>
 </html>

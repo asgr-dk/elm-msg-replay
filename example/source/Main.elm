@@ -2,96 +2,115 @@ port module Main exposing (main)
 
 import Browser
 import Browser.Navigation
-import Html
-import Html.Attributes
-import Html.Events
+import Html exposing (button, input, text)
+import Html.Attributes exposing (type_, value)
+import Html.Events exposing (onClick, onInput)
 import Json.Decode
 import Json.Encode
 import MsgReplay
 import Url exposing (Url)
 
 
-port input : (String -> msg) -> Sub msg
-
-
-port output : String -> Cmd msg
-
-
 type alias Flags =
     { msgs : Maybe String }
 
 
+type alias Model =
+    { name : String
+    , pass : String
+    , isLoggedIn : Bool
+    }
+
+
 type Msg
-    = DoNothing
-    | InputName String
+    = InputName String
     | InputPass String
     | LogIn
     | LogOut
 
 
-type Model
-    = LoggedOut { name : String, pass : String }
-    | LoggedIn { name : String }
+encodeMsg : Msg -> Json.Encode.Value
+encodeMsg msg =
+    Json.Encode.list Json.Encode.string
+        (case msg of
+            InputName name ->
+                [ "InputName", name ]
+
+            InputPass pass ->
+                [ "InputPass", pass ]
+
+            LogIn ->
+                [ "LogIn" ]
+
+            LogOut ->
+                [ "LogOut" ]
+        )
 
 
-main : MsgReplay.Program Flags Model Msg
-main =
-    MsgReplay.application
-        { init = init
-        , update = update
-        , view = view
-        , subscriptions = subscriptions
-        , onUrlChange = always DoNothing
-        , onUrlRequest = always DoNothing
-        , encodeMsg = encodeMsg
-        , msgDecoder = msgDecoder
-        , loadMsgs = .msgs
-        , saveMsgs = output
-        }
+msgDecoder : Json.Decode.Decoder Msg
+msgDecoder =
+    Json.Decode.andThen
+        (\strings ->
+            case strings of
+                [ "InputName", name ] ->
+                    Json.Decode.succeed (InputName name)
+
+                [ "InputPass", pass ] ->
+                    Json.Decode.succeed (InputPass pass)
+
+                [ "LogIn" ] ->
+                    Json.Decode.succeed LogIn
+
+                [ "LogOut" ] ->
+                    Json.Decode.succeed LogOut
+
+                _ ->
+                    Json.Decode.fail
+                        ("unrecognized message ["
+                            ++ String.join ", " strings
+                            ++ "]"
+                        )
+        )
+        (Json.Decode.list Json.Decode.string)
 
 
-init : Flags -> Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
-init _ _ _ =
-    ( LoggedOut { name = "", pass = "" }, Cmd.none )
+init : Flags -> ( Model, Cmd Msg )
+init _ =
+    ( { name = "", pass = "", isLoggedIn = False }
+    , Cmd.none
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case ( msg, model ) of
-        ( DoNothing, _ ) ->
-            ( model, Cmd.none )
+    case msg of
+        InputName name ->
+            ( { model | name = name }, Cmd.none )
 
-        ( InputName name, LoggedOut loggedOut ) ->
-            ( LoggedOut { loggedOut | name = name }, Cmd.none )
+        InputPass pass ->
+            ( { model | pass = pass }, Cmd.none )
 
-        ( InputPass pass, LoggedOut loggedOut ) ->
-            ( LoggedOut { loggedOut | pass = pass }, Cmd.none )
+        LogIn ->
+            ( { model | isLoggedIn = True }, Cmd.none )
 
-        ( LogIn, LoggedOut { name } ) ->
-            ( LoggedIn { name = name }, Cmd.none )
-
-        ( LogOut, LoggedIn { name } ) ->
-            ( LoggedOut { name = name, pass = "" }, Cmd.none )
-
-        _ ->
-            ( model, Cmd.none )
+        LogOut ->
+            ( { model | isLoggedIn = False }, Cmd.none )
 
 
 view : Model -> Browser.Document Msg
-view model =
+view { isLoggedIn, name, pass } =
     { title = "Example"
     , body =
-        case model of
-            LoggedOut { name, pass } ->
-                [ Html.input [ Html.Events.onInput InputName, Html.Attributes.value name ] []
-                , Html.input [ Html.Events.onInput InputPass, Html.Attributes.value pass ] []
-                , Html.button [ Html.Events.onClick LogIn ] [ Html.text "Log In" ]
-                ]
+        if isLoggedIn then
+            [ text ("hi " ++ name)
+            , button [ onClick LogOut ] [ text "Log Out" ]
+            ]
 
-            LoggedIn { name } ->
-                [ Html.text ("hi " ++ name)
-                , Html.button [ Html.Events.onClick LogOut ] [ Html.text "Log Out" ]
-                ]
+        else
+            [ input [ onInput InputName, value name ] []
+            , input [ onInput InputPass, value pass, type_ "password" ] []
+            , button [ onClick LogIn ] [ text "Log In" ]
+            ]
     }
 
 
@@ -100,53 +119,18 @@ subscriptions model =
     Sub.none
 
 
-encodeMsg : Msg -> Json.Encode.Value
-encodeMsg msg =
-    case msg of
-        DoNothing ->
-            Json.Encode.null
-
-        InputName name ->
-            Json.Encode.list Json.Encode.string [ "InputName", name ]
-
-        InputPass pass ->
-            Json.Encode.list Json.Encode.string [ "InputPass", pass ]
-
-        LogIn ->
-            Json.Encode.string "LogIn"
-
-        LogOut ->
-            Json.Encode.string "LogOut"
+port saveMsgs : String -> Cmd msg
 
 
-msgDecoder : Json.Decode.Decoder Msg
-msgDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.null DoNothing
-        , Json.Decode.andThen
-            (\list ->
-                case list of
-                    [ "InputName", name ] ->
-                        Json.Decode.succeed (InputName name)
-
-                    [ "InputPass", pass ] ->
-                        Json.Decode.succeed (InputPass pass)
-
-                    _ ->
-                        Json.Decode.fail ("unrecognized list [" ++ String.join "," list ++ "]")
-            )
-            (Json.Decode.list Json.Decode.string)
-        , Json.Decode.andThen
-            (\string ->
-                case string of
-                    "LogIn" ->
-                        Json.Decode.succeed LogIn
-
-                    "LogOut" ->
-                        Json.Decode.succeed LogOut
-
-                    _ ->
-                        Json.Decode.fail ("unrecognized string '" ++ string ++ "'")
-            )
-            Json.Decode.string
-        ]
+main : MsgReplay.Program Flags Model Msg
+main =
+    MsgReplay.document
+        { init = init
+        , update = update
+        , view = view
+        , subscriptions = subscriptions
+        , encodeMsg = encodeMsg
+        , msgDecoder = msgDecoder
+        , initMsgs = .msgs
+        , saveMsgs = saveMsgs
+        }
