@@ -2,6 +2,8 @@
 
 Reliable hot reloading for Elm programs!
 
+![](/example.mp4)
+
 ## Message Replay
 
 The goal of message replay is to regenerate state reliably when iterating on
