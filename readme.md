@@ -27,8 +27,8 @@ saved, or schedules a task to do so after 1 second of timeout.
 
 ## Example
 
-You can run the example by cloning and running the following commands with bash
-from the root of the repo:
+You can try the example by running the following commands with bash from the
+root of the repo:
 
 ```bash
 cd example
