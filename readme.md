@@ -16,8 +16,6 @@ until that message fails to decode, partially reproducing the previous state.
 
 ![](/demo.gif)
 
-### How It Works
-
 During initialization, messages are first read from flags and decoded into a
 list of json values. These values are then decoded and used to update the model,
 throwing away all commands produced along the way. This process runs until all
@@ -28,6 +26,9 @@ During runtime, all calls to the update function ensure messages are about to be
 saved, or schedules a task to do so after 1 second of timeout.
 
 ## Example
+
+You can run the example by cloning and running the following commands with bash
+from the root of the repo:
 
 ```bash
 cd example
