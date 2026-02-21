@@ -27,77 +27,93 @@ import Url exposing (Url)
 
 {-| A program with message-replay enabled.
 -}
-type alias Program flags model msg =
-    Platform.Program flags (Model model) (Msg msg)
+type alias Program flags appModel appMsg =
+    Platform.Program flags (Model appModel) (Msg appMsg)
 
 
 {-| Create an HTML element managed by Elm. More about that [here](https://package.elm-lang.org/packages/elm/browser/latest/Browser#element).
 -}
 element :
-    { init : flags -> ( model, Cmd msg )
-    , update : msg -> model -> ( model, Cmd msg )
-    , subscriptions : model -> Sub msg
-    , view : model -> Html msg
-    , encodeMsg : msg -> Json.Encode.Value
-    , msgDecoder : Json.Decode.Decoder msg
-    , initMsgs : flags -> Maybe String
-    , saveMsgs : String -> Cmd msg
+    { init : flags -> ( appModel, Cmd appMsg )
+    , update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+    , subscriptions : appModel -> Sub appMsg
+    , view : appModel -> Html appMsg
+    , enableReplay : flags -> Bool
+    , initMsgs : flags -> Json.Decode.Value
+    , saveMsgs : Json.Encode.Value -> Cmd appMsg
+    , saveMsgsDelayMillis : Float
+    , encodeMsg : appMsg -> Json.Encode.Value
+    , msgDecoder : Json.Decode.Decoder appMsg
     }
-    -> Program flags model msg
+    -> Program flags appModel appMsg
 element app =
     Browser.element
-        { init = init app.initMsgs app.encodeMsg app.msgDecoder app.update app.init
-        , update = update app.encodeMsg app.saveMsgs app.update
-        , view = .model >> app.view >> Html.map Msg
-        , subscriptions = .model >> app.subscriptions >> Sub.map Msg
+        { init = init app
+        , update = update app
+        , view = .appModel >> app.view >> Html.map AppMsg
+        , subscriptions = .appModel >> app.subscriptions >> Sub.map AppMsg
         }
 
 
 {-| Create an HTML document managed by Elm. More about that [here](https://package.elm-lang.org/packages/elm/browser/latest/Browser#document).
 -}
 document :
-    { init : flags -> ( model, Cmd msg )
-    , update : msg -> model -> ( model, Cmd msg )
-    , subscriptions : model -> Sub msg
-    , view : model -> Browser.Document msg
-    , encodeMsg : msg -> Json.Encode.Value
-    , msgDecoder : Json.Decode.Decoder msg
-    , initMsgs : flags -> Maybe String
-    , saveMsgs : String -> Cmd msg
+    { init : flags -> ( appModel, Cmd appMsg )
+    , update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+    , subscriptions : appModel -> Sub appMsg
+    , view : appModel -> Browser.Document appMsg
+    , enableReplay : flags -> Bool
+    , initMsgs : flags -> Json.Decode.Value
+    , saveMsgs : Json.Encode.Value -> Cmd appMsg
+    , saveMsgsDelayMillis : Float
+    , encodeMsg : appMsg -> Json.Encode.Value
+    , msgDecoder : Json.Decode.Decoder appMsg
     }
-    -> Program flags model msg
+    -> Program flags appModel appMsg
 document app =
     Browser.document
-        { init = init app.initMsgs app.encodeMsg app.msgDecoder app.update app.init
-        , update = update app.encodeMsg app.saveMsgs app.update
+        { init = init app
+        , update = update app
         , view = viewDocument app.view
-        , subscriptions = .model >> app.subscriptions >> Sub.map Msg
+        , subscriptions = .appModel >> app.subscriptions >> Sub.map AppMsg
         }
 
 
 {-| Create an application that manages Url changes. More about that [here](https://package.elm-lang.org/packages/elm/browser/latest/Browser#application).
 -}
 application :
-    { init : flags -> Url -> Browser.Navigation.Key -> ( model, Cmd msg )
-    , update : msg -> model -> ( model, Cmd msg )
-    , subscriptions : model -> Sub msg
-    , view : model -> Browser.Document msg
-    , onUrlChange : Url -> msg
-    , onUrlRequest : Browser.UrlRequest -> msg
-    , encodeMsg : msg -> Json.Encode.Value
-    , msgDecoder : Json.Decode.Decoder msg
-    , initMsgs : flags -> Maybe String
-    , saveMsgs : String -> Cmd msg
+    { init : flags -> Url -> Browser.Navigation.Key -> ( appModel, Cmd appMsg )
+    , update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+    , subscriptions : appModel -> Sub appMsg
+    , view : appModel -> Browser.Document appMsg
+    , onUrlChange : Url -> appMsg
+    , onUrlRequest : Browser.UrlRequest -> appMsg
+    , enableReplay : flags -> Bool
+    , initMsgs : flags -> Json.Decode.Value
+    , saveMsgs : Json.Encode.Value -> Cmd appMsg
+    , saveMsgsDelayMillis : Float
+    , encodeMsg : appMsg -> Json.Encode.Value
+    , msgDecoder : Json.Decode.Decoder appMsg
     }
-    -> Program flags model msg
+    -> Program flags appModel appMsg
 application app =
     Browser.application
-        { init = \flags url key -> init app.initMsgs app.encodeMsg app.msgDecoder app.update (\flags_ -> app.init flags_ url key) flags
-        , update = update app.encodeMsg app.saveMsgs app.update
+        { update = update app
         , view = viewDocument app.view
-        , subscriptions = .model >> app.subscriptions >> Sub.map Msg
-        , onUrlChange = app.onUrlChange >> Msg
-        , onUrlRequest = app.onUrlRequest >> Msg
+        , subscriptions = .appModel >> app.subscriptions >> Sub.map AppMsg
+        , onUrlChange = app.onUrlChange >> AppMsg
+        , onUrlRequest = app.onUrlRequest >> AppMsg
+        , init =
+            \flags url key ->
+                init
+                    { init = \flags_ -> app.init flags_ url key
+                    , enableReplay = app.enableReplay
+                    , initMsgs = app.initMsgs
+                    , encodeMsg = app.encodeMsg
+                    , msgDecoder = app.msgDecoder
+                    , update = app.update
+                    }
+                    flags
         }
 
 
@@ -105,72 +121,97 @@ application app =
 -- Internals
 
 
-type Msg msg
-    = Msg msg
-    | SaveModel
+type Msg appMsg
+    = AppMsg appMsg
+    | SaveAppModel
 
 
-type alias Model model =
-    { model : model
-    , msgs : List Json.Encode.Value
+type alias Model appModel =
+    { appModel : appModel
+    , appMsgs : List Json.Encode.Value
     , isSaving : Bool
+    , isEnabled : Bool
     }
 
 
-saveModelTimeoutMilliseconds : Float
-saveModelTimeoutMilliseconds =
-    1000
-
-
 init :
-    (flags -> Maybe String)
-    -> (msg -> Json.Encode.Value)
-    -> Json.Decode.Decoder msg
-    -> (msg -> model -> ( model, Cmd msg ))
-    -> (flags -> ( model, Cmd msg ))
+    { app
+        | enableReplay : flags -> Bool
+        , initMsgs : flags -> Json.Decode.Value
+        , encodeMsg : appMsg -> Json.Encode.Value
+        , msgDecoder : Json.Decode.Decoder appMsg
+        , update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+        , init : flags -> ( appModel, Cmd appMsg )
+    }
     -> flags
-    -> ( Model model, Cmd (Msg msg) )
-init initMsgs encodeMsg msgDecoder update_ init_ flags =
-    Tuple.mapBoth (initModel update_ msgDecoder (initMsgs flags))
-        (Cmd.map Msg)
-        (init_ flags)
+    -> ( Model appModel, Cmd (Msg appMsg) )
+init app flags =
+    Tuple.mapBoth
+        (if app.enableReplay flags then
+            initEnabled app flags
 
-
-initModel : (msg -> model -> ( model, Cmd msg )) -> Json.Decode.Decoder msg -> Maybe String -> model -> Model model
-initModel update_ msgDecoder msgsString model_ =
-    replayMsgs
-        update_
-        msgDecoder
-        (msgsString
-            |> Maybe.andThen (Json.Decode.decodeString (Json.Decode.list Json.Decode.value) >> Result.toMaybe)
-            |> Maybe.withDefault []
+         else
+            initDisabled
         )
-        { model = model_
-        , msgs = []
+        (Cmd.map AppMsg)
+        (app.init flags)
+
+
+initDisabled : appModel -> Model appModel
+initDisabled appModel =
+    { appModel = appModel
+    , appMsgs = []
+    , isSaving = False
+    , isEnabled = False
+    }
+
+
+initEnabled :
+    { app
+        | update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+        , msgDecoder : Json.Decode.Decoder appMsg
+        , initMsgs : flags -> Json.Decode.Value
+    }
+    -> flags
+    -> appModel
+    -> Model appModel
+initEnabled app flags appModel =
+    replayAppMsgs
+        app
+        (Result.withDefault []
+            (Json.Decode.decodeValue
+                (Json.Decode.list Json.Decode.value)
+                (app.initMsgs flags)
+            )
+        )
+        { appModel = appModel
+        , appMsgs = []
         , isSaving = False
+        , isEnabled = True
         }
 
 
-replayMsgs :
-    (msg -> model -> ( model, Cmd msg ))
-    -> Json.Decode.Decoder msg
+replayAppMsgs :
+    { app
+        | update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+        , msgDecoder : Json.Decode.Decoder appMsg
+    }
     -> List Json.Decode.Value
-    -> Model model
-    -> Model model
-replayMsgs update_ msgDecoder msgs model =
-    case msgs of
+    -> Model appModel
+    -> Model appModel
+replayAppMsgs app appMsgs model =
+    case appMsgs of
         [] ->
             model
 
         head :: tail ->
-            case Json.Decode.decodeValue msgDecoder head of
-                Ok msg ->
-                    replayMsgs update_
-                        msgDecoder
+            case Json.Decode.decodeValue app.msgDecoder head of
+                Ok appMsg ->
+                    replayAppMsgs app
                         tail
                         { model
-                            | model = Tuple.first (update_ msg model.model)
-                            , msgs = head :: model.msgs
+                            | appModel = Tuple.first (app.update appMsg model.appModel)
+                            , appMsgs = head :: model.appMsgs
                         }
 
                 Err _ ->
@@ -178,36 +219,53 @@ replayMsgs update_ msgDecoder msgs model =
 
 
 update :
-    (msg -> Json.Encode.Value)
-    -> (String -> Cmd msg)
-    -> (msg -> model -> ( model, Cmd msg ))
-    -> Msg msg
-    -> Model model
-    -> ( Model model, Cmd (Msg msg) )
-update encodeMsg saveMsgs update_ msg model =
+    { app
+        | saveMsgsDelayMillis : Float
+        , encodeMsg : appMsg -> Json.Encode.Value
+        , saveMsgs : Json.Encode.Value -> Cmd appMsg
+        , update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+    }
+    -> Msg appMsg
+    -> Model appModel
+    -> ( Model appModel, Cmd (Msg appMsg) )
+update app msg model =
     case msg of
-        Msg msg_ ->
-            updateMsg model (encodeMsg msg_) (update_ msg_ model.model)
+        AppMsg appMsg ->
+            if model.isEnabled then
+                updateAppMsgEnabled model
+                    app.saveMsgsDelayMillis
+                    (app.encodeMsg appMsg)
+                    (app.update appMsg model.appModel)
 
-        SaveModel ->
-            updateSaveModel saveMsgs model
+            else
+                updateAppMsgDisabled model
+                    (app.update appMsg model.appModel)
+
+        SaveAppModel ->
+            updateSaveAppModel app.saveMsgs model
 
 
-updateMsg :
-    Model model
+updateAppMsgDisabled : Model appModel -> ( appModel, Cmd appMsg ) -> ( Model appModel, Cmd (Msg appMsg) )
+updateAppMsgDisabled model ( appModel, appCmd ) =
+    ( { model | appModel = appModel }, Cmd.map AppMsg appCmd )
+
+
+updateAppMsgEnabled :
+    Model appModel
+    -> Float
     -> Json.Encode.Value
-    -> ( model, Cmd msg )
-    -> ( Model model, Cmd (Msg msg) )
-updateMsg model encodedMsg ( model_, cmd_ ) =
+    -> ( appModel, Cmd appMsg )
+    -> ( Model appModel, Cmd (Msg appMsg) )
+updateAppMsgEnabled model saveAppMsgsTimeout appMsgJson ( appModel, appCmd ) =
     ( { model
-        | model = model_
-        , msgs = encodedMsg :: model.msgs
+        | appModel = appModel
+        , appMsgs = appMsgJson :: model.appMsgs
         , isSaving = True
       }
     , Cmd.batch
-        [ Cmd.map Msg cmd_
+        [ Cmd.map AppMsg appCmd
         , if not model.isSaving then
-            Task.perform (always SaveModel) (Process.sleep saveModelTimeoutMilliseconds)
+            Task.perform (always SaveAppModel) (Process.sleep saveAppMsgsTimeout)
 
           else
             Cmd.none
@@ -215,26 +273,24 @@ updateMsg model encodedMsg ( model_, cmd_ ) =
     )
 
 
-updateSaveModel : (String -> Cmd msg) -> Model model -> ( Model model, Cmd (Msg msg) )
-updateSaveModel saveMsgs model =
+updateSaveAppModel : (Json.Encode.Value -> Cmd appMsg) -> Model appModel -> ( Model appModel, Cmd (Msg appMsg) )
+updateSaveAppModel saveAppMsgs model =
     ( { model | isSaving = False }
-    , Cmd.map Msg
-        (saveMsgs
-            (Json.Encode.encode 0
-                (Json.Encode.list identity
-                    (List.reverse model.msgs)
-                )
+    , Cmd.map AppMsg
+        (saveAppMsgs
+            (Json.Encode.list identity
+                (List.reverse model.appMsgs)
             )
         )
     )
 
 
-viewDocument : (model -> Browser.Document msg) -> Model model -> Browser.Document (Msg msg)
-viewDocument view_ model =
+viewDocument : (appModel -> Browser.Document appMsg) -> Model appModel -> Browser.Document (Msg appMsg)
+viewDocument viewApp model =
     let
         { title, body } =
-            view_ model.model
+            viewApp model.appModel
     in
     { title = title
-    , body = List.map (Html.map Msg) body
+    , body = List.map (Html.map AppMsg) body
     }

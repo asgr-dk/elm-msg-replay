@@ -12,7 +12,9 @@ import Url exposing (Url)
 
 
 type alias Flags =
-    { msgs : Maybe String }
+    { msgs : Json.Decode.Value
+    , isLocalhost : Bool
+    }
 
 
 type alias Model =
@@ -119,7 +121,7 @@ subscriptions model =
     Sub.none
 
 
-port saveMsgs : String -> Cmd msg
+port saveMsgs : Json.Encode.Value -> Cmd msg
 
 
 main : MsgReplay.Program Flags Model Msg
@@ -129,8 +131,10 @@ main =
         , update = update
         , view = view
         , subscriptions = subscriptions
+        , enableReplay = .isLocalhost
         , encodeMsg = encodeMsg
         , msgDecoder = msgDecoder
         , initMsgs = .msgs
         , saveMsgs = saveMsgs
+        , saveMsgsDelayMillis = 200
         }
