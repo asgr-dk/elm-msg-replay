@@ -1,0 +1,8 @@
+on:
+  push:
+    tags: ["*"]
+    branches: [main]
+
+jobs:
+  elm-publish:
+    uses: asgr-dk/actions/.github/workflows/elm-publish.yaml@main
