@@ -1,0 +1,11 @@
+on:
+  push:
+    tags: ["*"]
+    branches: [main]
+
+jobs:
+  todo:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "TODO"
