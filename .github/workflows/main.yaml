@@ -4,8 +4,5 @@ on:
     branches: [main]
 
 jobs:
-  todo:
-    runs-on: ubuntu-slim
-    steps:
-      - uses: actions/checkout@v4
-      - run: echo "TODO"
+  elm-publish:
+    uses: asgr-dk/actions/.github/workflows/elm-publish.yaml@1.1.0
