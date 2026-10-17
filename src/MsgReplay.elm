@@ -1,4 +1,4 @@
-module MsgReplay exposing (Program, application, document, element)
+module MsgReplay exposing (Program, application, document, element, worker)
 
 {-| Reliable hot reloading for Elm programs!
 
@@ -7,7 +7,7 @@ module MsgReplay exposing (Program, application, document, element)
 
 This API mirrors the `elm/browser` package found [here](https://package.elm-lang.org/packages/elm/browser/latest).
 
-@docs Program, application, document, element
+@docs Program, application, document, element, worker
 
 -}
 
@@ -107,6 +107,38 @@ application app =
             \flags url key ->
                 init
                     { init = \flags_ -> app.init flags_ url key
+                    , enableReplay = app.enableReplay
+                    , initMsgs = app.initMsgs
+                    , encodeMsg = app.encodeMsg
+                    , msgDecoder = app.msgDecoder
+                    , update = app.update
+                    }
+                    flags
+        }
+
+
+{-| Create a headless program with no user interface. More about that [here](https://package.elm-lang.org/packages/elm/core/latest/Platform#worker).
+-}
+worker :
+    { init : flags -> ( appModel, Cmd appMsg )
+    , update : appMsg -> appModel -> ( appModel, Cmd appMsg )
+    , subscriptions : appModel -> Sub appMsg
+    , enableReplay : flags -> Bool
+    , initMsgs : flags -> Json.Decode.Value
+    , saveMsgs : Json.Encode.Value -> Cmd appMsg
+    , saveMsgsDelayMillis : Float
+    , encodeMsg : appMsg -> Json.Encode.Value
+    , msgDecoder : Json.Decode.Decoder appMsg
+    }
+    -> Program flags appModel appMsg
+worker app =
+    Platform.worker
+        { update = update app
+        , subscriptions = .appModel >> app.subscriptions >> Sub.map AppMsg
+        , init =
+            \flags ->
+                init
+                    { init = \flags_ -> app.init flags_
                     , enableReplay = app.enableReplay
                     , initMsgs = app.initMsgs
                     , encodeMsg = app.encodeMsg
