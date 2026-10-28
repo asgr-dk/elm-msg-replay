@@ -5,4 +5,4 @@ on:
 
 jobs:
   elm-publish:
-    uses: asgr-dk/actions/.github/workflows/elm-publish.yaml@1.1.0
+    uses: asgr-dk/actions/.github/workflows/elm-publish.yaml@1.2.0
